@@ -21,6 +21,7 @@ Simulator::Simulator(bool prog_indicator, uint64_t seed) :
 {
   cont_ = static_cast<ControllerBase*>(&ref_con_);
   traj_ = static_cast<TrajectoryBase*>(&ref_con_);
+  landing_veh_ = static_cast<VehicleBase*>(&empty_veh_);
   srand(seed_);
 }
 
@@ -106,6 +107,7 @@ bool Simulator::run()
   {
     // Propagate forward in time and get new control input and true acceleration
     t_ += dt_;
+    landing_veh_->step(dt_);
     traj_->getCommandedState(t_, xc_, ur_);
     cont_->computeControl(t_, dyn_.get_state(), xc_, ur_, u_);
     dyn_.run(dt_, compute_low_level_control(u_));
@@ -400,6 +402,11 @@ void Simulator::use_custom_trajectory(TrajectoryBase *traj)
   traj_ = traj;
 }
 
+void Simulator::use_custom_vehicle(VehicleBase *veh)
+{
+  landing_veh_ = veh;
+}
+
 void Simulator::update_camera_pose()
 {
   x_I2c_ = state().X * x_b2c_;
@@ -410,7 +417,6 @@ void Simulator::update_simple_cam_pose()
 {
   x_I2sc_ = state().X * x_b2sc_;
 }
-
 
 
 void Simulator::update_imu_meas()
@@ -442,33 +448,36 @@ void Simulator::update_simple_cam_meas()
   {
     last_simple_cam_update_ = t_;
 
-    Vector3d pt(2., 0., 0.);
-    //Vector2d pixels = simple_cam_.proj(cam_frame_point);
-    //std::cout << "pix: " << pixels << std::endl;
-    //std::cout << "cam K: " << simple_cam_.K_ << std::endl;
-
+    // Move camera to correct location
     update_simple_cam_pose();
-    Vector3d pt_c = x_I2sc_.transformp(pt);
 
-    // we can reject anything behind the camera
-    //if (feature.zeta(2) < 0.0)
-      //return false;
+    // Get vehicle landmark points in the inertial frame
+    std::vector<Vector3d> pts;
+    landing_veh_->landmarkLocations(pts);
 
-    double pt_depth = pt_c.norm();
-    pt_c /= pt_depth;
-
-    // See if the pixel is in the camera frame
-    Vector2d pix;
-    simple_cam_.proj(pt_c, pix);
-    //std::cout << "pix: " << pix << std::endl;
-
+    // Project each point into the camera frame and add it to our sc_feats_ msg
     sc_feats_.clear();
-    sc_feats_.pixs.push_back(pix);
+
+    for (Vector3d pt : pts)
+    {
+      Vector3d pt_c = x_I2sc_.transformp(pt);
+
+      // we can reject anything behind the camera
+      //if (pt_c(2) < 0.0)
+        //continue;
+
+      double pt_depth = pt_c.norm();
+      pt_c /= pt_depth;
+
+      Vector2d pix;
+      simple_cam_.proj(pt_c, pix);
+
+      sc_feats_.pixs.push_back(pix);
+    }
 
     for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
         (*eit)->simpleCamCallback(t_, sc_feats_, sc_feat_R_, sc_depth_R_);
   }
-
 }
 
 void Simulator::update_camera_meas()

@@ -23,6 +23,8 @@
 #include "multirotor_sim/controller.h"
 #include "multirotor_sim/trajectory_base.h"
 #include "multirotor_sim/estimator_base.h"
+#include "multirotor_sim/vehicle_base.h"
+#include "multirotor_sim/empty_vehicle.h"
 
 
 #ifdef MULTIROTOR_SIM_PRINT_DEBUG
@@ -56,6 +58,7 @@ public:
   
   void load(std::string filename);
   void init_platform();
+  void init_vehicle();
   void init_imu();
   void init_simple_cam();
   void init_camera();
@@ -84,6 +87,8 @@ public:
   void use_custom_trajectory(TrajectoryBase* traj);
   void register_estimator(EstimatorBase* est);
 
+  void use_custom_vehicle(VehicleBase* veh);
+
   const Vector6d& imu() const { return dyn_.imu_;}
   const State& state() const { return dyn_.get_state(); }
   State& state() { return dyn_.get_state(); }
@@ -104,6 +109,9 @@ public:
   typedef std::vector<EstimatorBase*> estVec;
   estVec est_;
   double t_, dt_, tmax_, t_round_off_;
+
+  EmptyVehicle empty_veh_;
+  VehicleBase* landing_veh_;
 
   typedef struct
   {
