@@ -57,6 +57,7 @@ public:
   void load(std::string filename);
   void init_platform();
   void init_imu();
+  void init_simple_cam();
   void init_camera();
   void init_altimeter();
   void init_baro();
@@ -70,6 +71,7 @@ public:
 
   void update_measurements();
   void update_imu_meas();
+  void update_simple_cam_meas();
   void update_camera_meas();
   void update_alt_meas();
   void update_baro_meas();
@@ -147,6 +149,8 @@ public:
    */
   void update_camera_pose();
 
+  void update_simple_cam_pose();
+
 
 
   // Progress indicator, updated by run()
@@ -186,6 +190,18 @@ public:
   Vector3d gyro_bias_; // Memory for random walk
   double gyro_noise_stdev_;
   double gyro_walk_stdev_;
+
+  // Simple Cam
+  bool simple_cam_enabled_;
+  double simple_cam_update_rate_;
+  double sc_pixel_noise_stdev_;
+  double last_simple_cam_update_;
+  Camera<double> simple_cam_;
+  Matrix2d sc_feat_R_;
+  Matrix1d sc_depth_R_;
+  ImageFeat sc_feats_;
+  Xformd x_b2sc_;
+  Xformd x_I2sc_;
   
   // Camera (Features)
   bool camera_enabled_;

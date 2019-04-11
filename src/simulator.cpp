@@ -60,6 +60,7 @@ void Simulator::load(string filename)
   get_yaml_node("mocap_enabled", filename, mocap_enabled_);
   get_yaml_node("vo_enabled", filename, vo_enabled_);
   get_yaml_node("camera_enabled", filename, camera_enabled_);
+  get_yaml_node("simple_cam_enabled", filename, simple_cam_enabled_);
   get_yaml_node("gnss_enabled", filename, gnss_enabled_);
   get_yaml_node("raw_gnss_enabled", filename, raw_gnss_enabled_);
 
@@ -67,6 +68,8 @@ void Simulator::load(string filename)
 
   if (imu_enabled_)
     init_imu();
+  if (simple_cam_enabled_)
+    init_simple_cam();
   if (camera_enabled_)
     init_camera();
   if (alt_enabled_)
@@ -163,6 +166,25 @@ void Simulator::init_imu()
   imu_R_.topLeftCorner<3,3>() = accel_noise * accel_noise * I_3x3;
   imu_R_.bottomRightCorner<3,3>() = gyro_noise * gyro_noise * I_3x3;
   last_imu_update_ = 0.0;
+}
+
+
+void Simulator::init_simple_cam()
+{
+  get_yaml_node("simple_cam_update_rate", param_filename_, simple_cam_update_rate_);
+  get_yaml_eigen("sc_cam_center", param_filename_, simple_cam_.cam_center_);
+  get_yaml_eigen("sc_image_size", param_filename_, simple_cam_.image_size_);
+  get_yaml_eigen("q_b_sc", param_filename_, x_b2sc_.q_.arr_);
+  get_yaml_eigen("p_b_sc", param_filename_, x_b2sc_.t_);
+  get_yaml_eigen("sc_focal_len", param_filename_, simple_cam_.focal_len_);
+  get_yaml_node("sc_pixel_noise_stdev", param_filename_, sc_pixel_noise_stdev_);
+
+  x_b2sc_.q_.arr_ /= x_b2sc_.q_.arr_.norm();
+
+  sc_feat_R_ = sc_pixel_noise_stdev_ * sc_pixel_noise_stdev_ * I_2x2;
+
+  static const int num_feats = 1;
+  sc_feats_.reserve(num_feats);
 }
 
 
@@ -384,6 +406,13 @@ void Simulator::update_camera_pose()
 }
 
 
+void Simulator::update_simple_cam_pose()
+{
+  x_I2sc_ = state().X * x_b2sc_;
+}
+
+
+
 void Simulator::update_imu_meas()
 {
   double dt = t_ - last_imu_update_;
@@ -405,6 +434,42 @@ void Simulator::update_imu_meas()
   }
 }
 
+
+void Simulator::update_simple_cam_meas()
+{
+  // If it's time to capture new measurements, then do it
+  if (std::round((t_ - last_simple_cam_update_) * t_round_off_) / t_round_off_ >= 1.0/simple_cam_update_rate_)
+  {
+    last_simple_cam_update_ = t_;
+
+    Vector3d pt(2., 0., 0.);
+    //Vector2d pixels = simple_cam_.proj(cam_frame_point);
+    //std::cout << "pix: " << pixels << std::endl;
+    //std::cout << "cam K: " << simple_cam_.K_ << std::endl;
+
+    update_simple_cam_pose();
+    Vector3d pt_c = x_I2sc_.transformp(pt);
+
+    // we can reject anything behind the camera
+    //if (feature.zeta(2) < 0.0)
+      //return false;
+
+    double pt_depth = pt_c.norm();
+    pt_c /= pt_depth;
+
+    // See if the pixel is in the camera frame
+    Vector2d pix;
+    simple_cam_.proj(pt_c, pix);
+    //std::cout << "pix: " << pix << std::endl;
+
+    sc_feats_.clear();
+    sc_feats_.pixs.push_back(pix);
+
+    for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
+        (*eit)->simpleCamCallback(t_, sc_feats_, sc_feat_R_, sc_depth_R_);
+  }
+
+}
 
 void Simulator::update_camera_meas()
 {
@@ -666,6 +731,8 @@ void Simulator::update_measurements()
 {
   if (imu_enabled_)
     update_imu_meas();
+  if (simple_cam_enabled_)
+    update_simple_cam_meas();
   if (camera_enabled_)
     update_camera_meas();
   if (alt_enabled_)
