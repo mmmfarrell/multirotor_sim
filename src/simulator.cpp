@@ -473,6 +473,7 @@ void Simulator::update_simple_cam_meas()
       simple_cam_.proj(pt_c, pix);
 
       sc_feats_.pixs.push_back(pix);
+      sc_feats_.depths.push_back(pt_depth);
     }
 
     for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
