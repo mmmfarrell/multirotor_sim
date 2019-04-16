@@ -776,8 +776,6 @@ void Simulator::update_measurements()
 {
   if (imu_enabled_)
     update_imu_meas();
-  if (simple_cam_enabled_)
-    update_simple_cam_meas();
   if (camera_enabled_)
     update_camera_meas();
   if (alt_enabled_)
@@ -792,6 +790,8 @@ void Simulator::update_measurements()
     update_gnss_meas();
   if (raw_gnss_enabled_)
     update_raw_gnss_meas();
+  if (simple_cam_enabled_)
+    update_simple_cam_meas();
 }
 
 
