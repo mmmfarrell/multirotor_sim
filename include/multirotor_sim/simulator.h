@@ -66,6 +66,7 @@ public:
   void init_baro();
   void init_vo();
   void init_mocap();
+  void init_velocity();
   void init_gnss();
   void init_raw_gnss();
 
@@ -79,6 +80,7 @@ public:
   void update_alt_meas();
   void update_baro_meas();
   void update_mocap_meas();
+  void update_velocity_meas();
   void update_vo_meas();
   void update_gnss_meas();
   void update_raw_gnss_meas();
@@ -278,6 +280,14 @@ public:
   double mocap_transmission_noise_;
   double mocap_transmission_time_;
   deque<std::pair<double, measurement_t>, aligned_allocator<std::pair<double, measurement_t>>> mocap_measurement_buffer_; // container to hold measurements while waiting for delay
+
+  // Velocity Sensor
+  bool velocity_enabled_;
+  double velocity_update_rate_;
+  Matrix3d velocity_R_;
+  double velocity_noise_stdev_;
+  double last_velocity_update_;
+  double next_velocity_measurement_;
 
   // GNSS
   bool gnss_enabled_;

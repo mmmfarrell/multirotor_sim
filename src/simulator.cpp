@@ -59,6 +59,7 @@ void Simulator::load(string filename)
   get_yaml_node("alt_enabled", filename, alt_enabled_);
   get_yaml_node("baro_enabled", filename, baro_enabled_);
   get_yaml_node("mocap_enabled", filename, mocap_enabled_);
+  get_yaml_node("velocity_sensor_enabled", filename, velocity_enabled_);
   get_yaml_node("vo_enabled", filename, vo_enabled_);
   get_yaml_node("camera_enabled", filename, camera_enabled_);
   get_yaml_node("simple_cam_enabled", filename, simple_cam_enabled_);
@@ -81,6 +82,8 @@ void Simulator::load(string filename)
     init_vo();
   if (mocap_enabled_)
     init_mocap();
+  if (velocity_enabled_)
+    init_velocity();
   if (gnss_enabled_)
     init_gnss();
   if (raw_gnss_enabled_)
@@ -305,6 +308,20 @@ void Simulator::init_mocap()
 
   last_mocap_update_ = 0.0;
   next_mocap_measurement_ = 0.0;
+}
+
+
+void Simulator::init_velocity()
+{
+  double vel_noise;
+  get_yaml_node("velocity_update_rate", param_filename_, velocity_update_rate_);
+  get_yaml_node("velocity_noise_stdev", param_filename_, vel_noise);
+  velocity_noise_stdev_ = vel_noise;
+
+  velocity_R_ << vel_noise * vel_noise * I_3x3;
+
+  last_velocity_update_ = 0.0;
+  next_velocity_measurement_ = 0.0;
 }
 
 
@@ -641,6 +658,22 @@ void Simulator::update_mocap_meas()
 }
 
 
+void Simulator::update_velocity_meas()
+{
+  if (std::round((t_ - last_velocity_update_) * t_round_off_) / t_round_off_ >=
+      1.0 / velocity_update_rate_)
+  {
+    Vector3d noise =
+        randomNormal<Vector3d>(velocity_noise_stdev_, normal_, rng_);
+
+    Vector3d vel_meas = state().v + noise;
+
+    for (estVec::iterator it = est_.begin(); it != est_.end(); it++)
+      (*it)->velocityCallback(t_, vel_meas, velocity_R_);
+  }
+}
+
+
 void Simulator::update_vo_meas()
 {
   Xformd T_i2b = dyn_.get_global_pose();
@@ -751,6 +784,8 @@ void Simulator::update_measurements()
     update_alt_meas();
   if (mocap_enabled_)
     update_mocap_meas();
+  if (velocity_enabled_)
+    update_velocity_meas();
   if (vo_enabled_)
     update_vo_meas();
   if (gnss_enabled_)
