@@ -189,6 +189,7 @@ void Simulator::init_simple_cam()
   get_yaml_eigen("p_b_sc", param_filename_, x_b2sc_.t_);
   get_yaml_eigen("sc_focal_len", param_filename_, simple_cam_.focal_len_);
   get_yaml_node("sc_pixel_noise_stdev", param_filename_, sc_pixel_noise_stdev_);
+  get_yaml_node("sc_depth_noise_stdev", param_filename_, sc_depth_noise_stdev_);
 
   x_b2sc_.q_.arr_ /= x_b2sc_.q_.arr_.norm();
 
@@ -490,7 +491,8 @@ void Simulator::update_simple_cam_meas()
         //continue;
 
       // Not really depth, but distance in z direction
-      sc_feats_.depths.push_back(pt_c(2));
+      double measured_depth = pt_c(2) + sc_depth_noise_stdev_ * normal_(rng_);
+      sc_feats_.depths.push_back(measured_depth);
 
       double pt_depth = pt_c.norm();
       pt_c /= pt_depth;
@@ -498,6 +500,7 @@ void Simulator::update_simple_cam_meas()
       Vector2d pix;
       simple_cam_.proj(pt_c, pix);
 
+      pix += randomNormal<Vector2d>(sc_pixel_noise_stdev_, normal_, rng_);
       sc_feats_.pixs.push_back(pix);
     }
 

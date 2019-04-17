@@ -207,6 +207,7 @@ public:
   bool simple_cam_enabled_;
   double simple_cam_update_rate_;
   double sc_pixel_noise_stdev_;
+  double sc_depth_noise_stdev_;
   double last_simple_cam_update_;
   Camera<double> simple_cam_;
   Matrix2d sc_feat_R_;
