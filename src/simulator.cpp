@@ -54,6 +54,8 @@ void Simulator::load(string filename)
     log_.open(log_filename_);
   }
 
+  get_yaml_node("follow_vehicle", filename, follow_vehicle_);
+
   // Initialize Desired sensors
   get_yaml_node("imu_enabled", filename, imu_enabled_);
   get_yaml_node("alt_enabled", filename, alt_enabled_);
@@ -112,6 +114,10 @@ bool Simulator::run()
     t_ += dt_;
     landing_veh_->step(dt_);
     traj_->getCommandedState(t_, xc_, ur_);
+
+    if (follow_vehicle_)
+      xc_.p.block<2, 1>(0, 0) += landing_veh_->getPosition();
+
     cont_->computeControl(t_, dyn_.get_state(), xc_, ur_, u_);
     dyn_.run(dt_, compute_low_level_control(u_));
     if (prog_indicator_)

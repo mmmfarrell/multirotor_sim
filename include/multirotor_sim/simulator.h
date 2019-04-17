@@ -174,6 +174,8 @@ public:
   Vector4d ur_; // Reference Command given by the trajectory
   State xc_; // Desired State
 
+  bool follow_vehicle_;
+
   // Random number Generation
   uint64_t seed_;
   default_random_engine rng_;

@@ -18,6 +18,13 @@ public:
   {
     pts.clear();
   }
+
+  virtual Vector2d getPosition()
+  {
+    Vector2d pos;
+    pos.setZero();
+    return pos;
+  }
 };
 
 }
