@@ -194,6 +194,7 @@ void Simulator::init_simple_cam()
   x_b2sc_.q_.arr_ /= x_b2sc_.q_.arr_.norm();
 
   sc_feat_R_ = sc_pixel_noise_stdev_ * sc_pixel_noise_stdev_ * I_2x2;
+  sc_depth_R_ = sc_depth_noise_stdev_ * sc_depth_noise_stdev_ * Matrix1d::Identity();
 
   static const int num_feats = 1;
   sc_feats_.reserve(num_feats);
