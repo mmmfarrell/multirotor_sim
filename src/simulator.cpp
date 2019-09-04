@@ -508,12 +508,14 @@ void Simulator::update_simple_cam_meas()
     if (landmarks_enabled_)
     {
       // Get vehicle landmark points in the inertial frame
+      std::vector<int> lm_ids;
       std::vector<Vector3d> lm_pts;
-      landing_veh_->landmarkLocations(lm_pts);
+      landing_veh_->landmarkLocations(lm_ids, lm_pts);
 
       // Project each point into the camera frame and add it to our
       // sc_landmarks_ msg
       sc_landmarks_.clear();
+      sc_landmarks_.feat_ids = lm_ids;
 
       for (Vector3d pt : lm_pts)
       {
