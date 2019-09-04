@@ -26,7 +26,9 @@ public:
     virtual void velocityCallback(const double& t, const Vector3d& z, const Matrix3d& R) {}
     virtual void voCallback(const double& t, const Xformd& z, const Matrix6d& R) {}
     virtual void imageCallback(const double& t, const ImageFeat& z, const Matrix2d& R_pix, const Matrix1d& R_depth) {}
-    virtual void simpleCamCallback(const double& t, const ImageFeat& z, const Matrix2d& R_pix, const Matrix1d& R_depth) {}
+
+    virtual void arucoCallback(const double& t, const Vector2d& pix, const double& depth, const Matrix2d& R_pix, const Matrix1d& R_depth) {}
+    virtual void landmarksCallback(const double& t, const ImageFeat& z, const Matrix2d& R_pix) {}
 
     // t - current time (seconds)
     // z - gnss measurement [p_{b/ECEF}^ECEF, v_{b/ECEF}^ECEF]

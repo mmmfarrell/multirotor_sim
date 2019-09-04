@@ -206,13 +206,17 @@ public:
   // Simple Cam
   bool simple_cam_enabled_;
   double simple_cam_update_rate_;
-  double sc_pixel_noise_stdev_;
-  double sc_depth_noise_stdev_;
+  bool aruco_enabled_;
+  double aruco_pixel_noise_stdev_;
+  double aruco_depth_noise_stdev_;
+  Matrix2d aruco_pixel_R_;
+  Matrix1d aruco_depth_R_;
+  bool landmarks_enabled_;
+  double lm_pixel_noise_stdev_;
+  Matrix2d lm_pixel_R_;
   double last_simple_cam_update_;
   Camera<double> simple_cam_;
-  Matrix2d sc_feat_R_;
-  Matrix1d sc_depth_R_;
-  ImageFeat sc_feats_;
+  ImageFeat sc_landmarks_;
   Xformd x_b2sc_;
   Xformd x_I2sc_;
   

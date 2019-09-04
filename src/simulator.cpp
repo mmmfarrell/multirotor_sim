@@ -185,19 +185,27 @@ void Simulator::init_simple_cam()
   get_yaml_node("simple_cam_update_rate", param_filename_, simple_cam_update_rate_);
   get_yaml_eigen("sc_cam_center", param_filename_, simple_cam_.cam_center_);
   get_yaml_eigen("sc_image_size", param_filename_, simple_cam_.image_size_);
+  get_yaml_eigen("sc_focal_len", param_filename_, simple_cam_.focal_len_);
+
+  get_yaml_node("aruco_enabled", param_filename_, aruco_enabled_);
+  get_yaml_node("aruco_pixel_stdev", param_filename_, aruco_pixel_noise_stdev_);
+  get_yaml_node("aruco_depth_stdev", param_filename_, aruco_depth_noise_stdev_);
+
+  aruco_pixel_R_ = aruco_pixel_noise_stdev_ * aruco_pixel_noise_stdev_ * I_2x2;
+  aruco_depth_R_ = aruco_depth_noise_stdev_ * aruco_depth_noise_stdev_ * Matrix1d::Identity();
+
+  get_yaml_node("landmarks_enabled", param_filename_, landmarks_enabled_);
+  get_yaml_node("landmarks_pixel_stdev", param_filename_, lm_pixel_noise_stdev_);
+
+  lm_pixel_R_ = lm_pixel_noise_stdev_ * lm_pixel_noise_stdev_ * I_2x2;
+
   get_yaml_eigen("q_b_sc", param_filename_, x_b2sc_.q_.arr_);
   get_yaml_eigen("p_b_sc", param_filename_, x_b2sc_.t_);
-  get_yaml_eigen("sc_focal_len", param_filename_, simple_cam_.focal_len_);
-  get_yaml_node("sc_pixel_noise_stdev", param_filename_, sc_pixel_noise_stdev_);
-  get_yaml_node("sc_depth_noise_stdev", param_filename_, sc_depth_noise_stdev_);
 
   x_b2sc_.q_.arr_ /= x_b2sc_.q_.arr_.norm();
 
-  sc_feat_R_ = sc_pixel_noise_stdev_ * sc_pixel_noise_stdev_ * I_2x2;
-  sc_depth_R_ = sc_depth_noise_stdev_ * sc_depth_noise_stdev_ * Matrix1d::Identity();
-
-  static const int num_feats = 1;
-  sc_feats_.reserve(num_feats);
+  //static const int num_feats = 1;
+  //sc_feats_.reserve(num_feats);
 }
 
 
@@ -476,123 +484,144 @@ void Simulator::update_simple_cam_meas()
     // Move camera to correct location
     update_simple_cam_pose();
 
-    // Get vehicle landmark points in the inertial frame
-    std::vector<Vector3d> pts;
-    landing_veh_->landmarkLocations(pts);
-
-    // Project each point into the camera frame and add it to our sc_feats_ msg
-    sc_feats_.clear();
-
-    for (Vector3d pt : pts)
+    //////////////// Aruco update ////////////////
+    if (aruco_enabled_)
     {
-      Vector3d pt_c = x_I2sc_.transformp(pt);
-
-      // we can reject anything behind the camera
-      //if (pt_c(2) < 0.0)
-        //continue;
+      Vector3d aruco_pt_I;
+      landing_veh_->arucoLocation(aruco_pt_I);
 
       // Not really depth, but distance in z direction
-      double measured_depth = pt_c(2) + sc_depth_noise_stdev_ * normal_(rng_);
-      sc_feats_.depths.push_back(measured_depth);
+      Vector3d aruco_pt_c = x_I2sc_.transformp(aruco_pt_I);
+      double measured_depth = aruco_pt_c(2) + aruco_depth_noise_stdev_ * normal_(rng_);
 
-      double pt_depth = pt_c.norm();
-      pt_c /= pt_depth;
+      // Normalize and project to get camera pixels
+      aruco_pt_c /= aruco_pt_c.norm();
+      Vector2d aruco_pix;
+      simple_cam_.proj(aruco_pt_c, aruco_pix);
+      aruco_pix += randomNormal<Vector2d>(aruco_pixel_noise_stdev_, normal_, rng_);
 
-      Vector2d pix;
-      simple_cam_.proj(pt_c, pix);
-
-      pix += randomNormal<Vector2d>(sc_pixel_noise_stdev_, normal_, rng_);
-      sc_feats_.pixs.push_back(pix);
+      for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
+          (*eit)->arucoCallback(t_, aruco_pix, measured_depth, aruco_pixel_R_, aruco_depth_R_);
     }
 
-    for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
-        (*eit)->simpleCamCallback(t_, sc_feats_, sc_feat_R_, sc_depth_R_);
+    //////////////// Landmarks update ////////////////
+    if (landmarks_enabled_)
+    {
+      // Get vehicle landmark points in the inertial frame
+      std::vector<Vector3d> lm_pts;
+      landing_veh_->landmarkLocations(lm_pts);
+
+      // Project each point into the camera frame and add it to our
+      // sc_landmarks_ msg
+      sc_landmarks_.clear();
+
+      for (Vector3d pt : lm_pts)
+      {
+        Vector3d pt_c = x_I2sc_.transformp(pt);
+
+        // we can reject anything behind the camera
+        // if (pt_c(2) < 0.0)
+        // continue;
+
+        double pt_depth = pt_c.norm();
+        pt_c /= pt_depth;
+
+        Vector2d pix;
+        simple_cam_.proj(pt_c, pix);
+
+        pix += randomNormal<Vector2d>(lm_pixel_noise_stdev_, normal_, rng_);
+        sc_landmarks_.pixs.push_back(pix);
+      }
+
+      for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
+        (*eit)->landmarksCallback(t_, sc_landmarks_, lm_pixel_R_);
+    }
   }
 }
 
 void Simulator::update_camera_meas()
 {
-  // If it's time to capture new measurements, then do it
-  if (std::round((t_ - last_camera_update_) * t_round_off_) / t_round_off_ >= 1.0/camera_update_rate_)
-  {
-    last_camera_update_ = t_;
-    update_camera_pose();
+  //// If it's time to capture new measurements, then do it
+  //if (std::round((t_ - last_camera_update_) * t_round_off_) / t_round_off_ >= 1.0/camera_update_rate_)
+  //{
+    //last_camera_update_ = t_;
+    //update_camera_pose();
 
-    double pub_time = t_ + std::max(camera_transmission_time_ + normal_(rng_) * camera_transmission_noise_, 0.0);
+    //double pub_time = t_ + std::max(camera_transmission_time_ + normal_(rng_) * camera_transmission_noise_, 0.0);
 
-    // Update feature measurements for currently tracked features
-    for(auto it = tracked_points_.begin(); it != tracked_points_.end();)
-    {
-      if (update_feature(*it))
-      {
-        measurement_t meas;
-        meas.t = t_ + camera_time_offset_;
-        meas.z = it->pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
-        meas.R = feat_R_;
-        meas.feature_id = (*it).id;
-        meas.depth = it->depth + depth_noise_stdev_ * normal_(rng_);
-        camera_measurements_buffer_.push_back(std::pair<double, measurement_t>{pub_time, meas});
-        DBG("update feature - ID = %d\n", it->id);
-        it++;
-      }
-      else
-      {
-        if (it->zeta(2,0) < 0)
-        {
-          DBG("clearing feature - ID = %d because went negative [%f, %f, %f]\n",
-              it->id, it->zeta(0,0), it->zeta(1,0), it->zeta(2,0));
-        }
-        else if ((it->pixel.array() < 0).any() || (it->pixel.array() > cam_.image_size_.array()).any())
-        {
-          DBG("clearing feature - ID = %d because went out of frame [%f, %f]\n",
-              it->id, it->pixel(0,0), it->pixel(1,0));
-        }
-        tracked_points_.erase(it);
-      }
-    }
+    //// Update feature measurements for currently tracked features
+    //for(auto it = tracked_points_.begin(); it != tracked_points_.end();)
+    //{
+      //if (update_feature(*it))
+      //{
+        //measurement_t meas;
+        //meas.t = t_ + camera_time_offset_;
+        //meas.z = it->pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
+        //meas.R = feat_R_;
+        //meas.feature_id = (*it).id;
+        //meas.depth = it->depth + depth_noise_stdev_ * normal_(rng_);
+        //camera_measurements_buffer_.push_back(std::pair<double, measurement_t>{pub_time, meas});
+        //DBG("update feature - ID = %d\n", it->id);
+        //it++;
+      //}
+      //else
+      //{
+        //if (it->zeta(2,0) < 0)
+        //{
+          //DBG("clearing feature - ID = %d because went negative [%f, %f, %f]\n",
+              //it->id, it->zeta(0,0), it->zeta(1,0), it->zeta(2,0));
+        //}
+        //else if ((it->pixel.array() < 0).any() || (it->pixel.array() > cam_.image_size_.array()).any())
+        //{
+          //DBG("clearing feature - ID = %d because went out of frame [%f, %f]\n",
+              //it->id, it->pixel(0,0), it->pixel(1,0));
+        //}
+        //tracked_points_.erase(it);
+      //}
+    //}
 
-    while (tracked_points_.size() < num_features_)
-    {
-      // Add the new feature to our "tracker"
-      feature_t new_feature;
-      if (!get_feature_in_frame(new_feature, loop_closure_))
-        break;
-      tracked_points_.push_back(new_feature);
-      DBG("new feature - ID = %d [%f, %f, %f], [%f, %f]\n",
-          new_feature.id, new_feature.zeta(0,0), new_feature.zeta(1,0),
-          new_feature.zeta(2,0), new_feature.pixel(0,0), new_feature.pixel(1,0));
+    //while (tracked_points_.size() < num_features_)
+    //{
+      //// Add the new feature to our "tracker"
+      //feature_t new_feature;
+      //if (!get_feature_in_frame(new_feature, loop_closure_))
+        //break;
+      //tracked_points_.push_back(new_feature);
+      //DBG("new feature - ID = %d [%f, %f, %f], [%f, %f]\n",
+          //new_feature.id, new_feature.zeta(0,0), new_feature.zeta(1,0),
+          //new_feature.zeta(2,0), new_feature.pixel(0,0), new_feature.pixel(1,0));
 
-      // Create a measurement for this new feature
-      measurement_t meas;
-      meas.t = t_ + camera_time_offset_;
-      meas.z = new_feature.pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
-      meas.R = feat_R_;
-      meas.feature_id = new_feature.id;
-      meas.depth = new_feature.depth + depth_noise_stdev_ * normal_(rng_);
-      camera_measurements_buffer_.push_back(std::pair<double, measurement_t>{pub_time, meas});
-    }
-  }
+      //// Create a measurement for this new feature
+      //measurement_t meas;
+      //meas.t = t_ + camera_time_offset_;
+      //meas.z = new_feature.pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
+      //meas.R = feat_R_;
+      //meas.feature_id = new_feature.id;
+      //meas.depth = new_feature.depth + depth_noise_stdev_ * normal_(rng_);
+      //camera_measurements_buffer_.push_back(std::pair<double, measurement_t>{pub_time, meas});
+    //}
+  //}
 
-  // Push out the measurement if it is time to send it
-  if (camera_measurements_buffer_.size() > 0 && camera_measurements_buffer_[0].first >= t_)
-  {
-    // Populate the Image class with all feature measurements
-    img_.clear();
-    img_.t = camera_measurements_buffer_[0].second.t;
-    img_.id = image_id_;
-    for (auto zit = camera_measurements_buffer_.begin(); zit != camera_measurements_buffer_.end(); zit++)
-    {
-      img_.pixs.push_back(zit->second.z);
-      img_.feat_ids.push_back(zit->second.feature_id);
-      img_.depths.push_back(zit->second.depth);
-    }
+  //// Push out the measurement if it is time to send it
+  //if (camera_measurements_buffer_.size() > 0 && camera_measurements_buffer_[0].first >= t_)
+  //{
+    //// Populate the Image class with all feature measurements
+    //img_.clear();
+    //img_.t = camera_measurements_buffer_[0].second.t;
+    //img_.id = image_id_;
+    //for (auto zit = camera_measurements_buffer_.begin(); zit != camera_measurements_buffer_.end(); zit++)
+    //{
+      //img_.pixs.push_back(zit->second.z);
+      //img_.feat_ids.push_back(zit->second.feature_id);
+      //img_.depths.push_back(zit->second.depth);
+    //}
 
-    for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
-        (*eit)->imageCallback(t_, img_, feat_R_, depth_R_);
+    //for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
+        //(*eit)->imageCallback(t_, img_, feat_R_, depth_R_);
 
-    camera_measurements_buffer_.clear();
-    ++image_id_;
-  }
+    //camera_measurements_buffer_.clear();
+    //++image_id_;
+  //}
 }
 
 

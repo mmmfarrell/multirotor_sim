@@ -14,6 +14,8 @@ public:
   EmptyVehicle() {}
 
   void step(const double& dt) {}
+  void arucoLocation(Vector3d& pt) {}
+
   void landmarkLocations(std::vector<Vector3d>& pts)
   {
     pts.clear();
