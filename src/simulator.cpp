@@ -490,18 +490,29 @@ void Simulator::update_simple_cam_meas()
       Vector3d aruco_pt_I;
       landing_veh_->arucoLocation(aruco_pt_I);
 
-      // Not really depth, but distance in z direction
-      Vector3d aruco_pt_c = x_I2sc_.transformp(aruco_pt_I);
-      double measured_depth = aruco_pt_c(2) + aruco_depth_noise_stdev_ * normal_(rng_);
+      quat::Quatd q_I_a;
+      landing_veh_->arucoOrientation(q_I_a);
 
-      // Normalize and project to get camera pixels
-      aruco_pt_c /= aruco_pt_c.norm();
-      Vector2d aruco_pix;
-      simple_cam_.proj(aruco_pt_c, aruco_pix);
-      aruco_pix += randomNormal<Vector2d>(aruco_pixel_noise_stdev_, normal_, rng_);
+      const xform::Xformd x_I2a(aruco_pt_I, q_I_a);
+      const xform::Xformd x_sc2a = x_I2sc_.inverse() * x_I2a;
+
+      const xform::Xformd x_c2a_meas = x_sc2a;
+
+      const Eigen::Matrix<double, 6, 6> aruco_R_ = 0.1 * Matrix6d::Identity();
+
+      //// Not really depth, but distance in z direction
+      //Vector3d aruco_pt_c = x_I2sc_.transformp(aruco_pt_I);
+      //double measured_depth = aruco_pt_c(2) + aruco_depth_noise_stdev_ * normal_(rng_);
+
+      //// Normalize and project to get camera pixels
+      //aruco_pt_c /= aruco_pt_c.norm();
+      //Vector2d aruco_pix;
+      //simple_cam_.proj(aruco_pt_c, aruco_pix);
+      //aruco_pix += randomNormal<Vector2d>(aruco_pixel_noise_stdev_, normal_, rng_);
 
       for (estVec::iterator eit = est_.begin(); eit != est_.end(); eit++)
-          (*eit)->arucoCallback(t_, aruco_pix, measured_depth, aruco_pixel_R_, aruco_depth_R_);
+          (*eit)->arucoCallback(t_, x_c2a_meas, aruco_R_);
+          //(*eit)->arucoCallback(t_, aruco_pix, measured_depth, aruco_pixel_R_, aruco_depth_R_);
     }
 
     //////////////// Landmarks update ////////////////

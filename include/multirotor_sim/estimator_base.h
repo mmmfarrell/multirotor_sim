@@ -12,6 +12,7 @@ namespace  multirotor_sim
 
 typedef std::vector<Vector3d, aligned_allocator<Vector3d>> VecVec3;
 typedef std::vector<Matrix3d, aligned_allocator<Matrix3d>> VecMat3;
+
 class EstimatorBase
 {
 public:
@@ -27,7 +28,7 @@ public:
     virtual void voCallback(const double& t, const Xformd& z, const Matrix6d& R) {}
     virtual void imageCallback(const double& t, const ImageFeat& z, const Matrix2d& R_pix, const Matrix1d& R_depth) {}
 
-    virtual void arucoCallback(const double& t, const Vector2d& pix, const double& depth, const Matrix2d& R_pix, const Matrix1d& R_depth) {}
+    virtual void arucoCallback(const double& t, const xform::Xformd& x_c2a_meas, const Matrix6d& aruco_R) {}
     virtual void landmarksCallback(const double& t, const ImageFeat& z, const Matrix2d& R_pix) {}
 
     // t - current time (seconds)

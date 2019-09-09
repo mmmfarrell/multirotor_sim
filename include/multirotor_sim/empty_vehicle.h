@@ -17,6 +17,12 @@ public:
   void step(const double& dt)
   {
   }
+
+  void arucoOrientation(quat::Quatd& q_I_a)
+  {
+
+  }
+
   void arucoLocation(Vector3d& pt)
   {
   }
