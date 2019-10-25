@@ -173,6 +173,7 @@ struct IMU
     gyro(arr.data()+3)
   {}
 };
+}
 
 class ImageFeat
 {
@@ -200,4 +201,3 @@ public:
 };
 
 
-} // namespace multirotor_sim
