@@ -206,6 +206,7 @@ void Simulator::init_simple_cam()
 
   //static const int num_feats = 1;
   //sc_feats_.reserve(num_feats);
+  last_simple_cam_update_ = 0.;
 }
 
 
