@@ -496,9 +496,15 @@ void Simulator::update_simple_cam_meas()
       const xform::Xformd x_I2a(aruco_pt_I, q_I_a);
       const xform::Xformd x_sc2a = x_I2sc_.inverse() * x_I2a;
 
-      const xform::Xformd x_c2a_meas = x_sc2a;
+      xform::Xformd x_c2a_meas = x_sc2a;
 
-      const Eigen::Matrix<double, 6, 6> aruco_R_ = 0.1 * Matrix6d::Identity();
+      const double aruco_pos_std = 0.1;
+      const double aruco_att_std = 0.1;
+      Eigen::Matrix<double, 6, 6> aruco_R_ = aruco_pos_std * aruco_pos_std * Matrix6d::Identity();
+      aruco_R_.bottomRightCorner(3, 3) = aruco_att_std * aruco_att_std * Eigen::Matrix3d::Identity();
+
+      x_c2a_meas.t_ += randomNormal<Vector3d>(aruco_pos_std, normal_, rng_);
+      x_c2a_meas.q_ += randomNormal<Vector3d>(aruco_att_std, normal_, rng_);
 
       //// Not really depth, but distance in z direction
       //Vector3d aruco_pt_c = x_I2sc_.transformp(aruco_pt_I);
