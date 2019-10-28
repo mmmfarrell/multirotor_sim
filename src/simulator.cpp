@@ -756,16 +756,16 @@ void Simulator::update_gnss_meas()
     Vector3d p_NED = dyn_.get_global_pose().t();
     p_NED.segment<2>(0) += gnss_horizontal_position_stdev_ * randomNormal<Vector2d>(normal_, rng_);
     p_NED(2) += gnss_vertical_position_stdev_ * normal_(rng_);
-    //Vector3d p_ECEF = WSG84::ned2ecef(X_e2n_, p_NED);
+    Vector3d p_ECEF = WSG84::ned2ecef(X_e2n_, p_NED);
 
     Vector3d v_NED = dyn_.get_global_pose().q().rota(dyn_.get_state().v);
     v_NED += gnss_velocity_stdev_ * randomNormal<Vector3d>(normal_, rng_);
-    //Vector3d v_ECEF = X_e2n_.q().rota(v_NED);
-    //v_ECEF += gnss_velocity_stdev_ * randomNormal<Vector3d>(normal_, rng_);
+    Vector3d v_ECEF = X_e2n_.q().rota(v_NED);
+    v_ECEF += gnss_velocity_stdev_ * randomNormal<Vector3d>(normal_, rng_);
 
     Vector6d z;
-    //z << p_ECEF, v_ECEF;
-    z << p_NED, v_NED;
+    z << p_ECEF, v_ECEF;
+    // z << p_NED, v_NED;
 
     for (estVec::iterator it = est_.begin(); it != est_.end(); it++)
       (*it)->gnssCallback(t_, z, gnss_R_);
